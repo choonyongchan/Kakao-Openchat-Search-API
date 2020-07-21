@@ -1,9 +1,10 @@
+//© 2020 KeonWoo PARK <parkkw472@gmail.com>
 var request = require("request");
 var ip = require('ip');
 var fetch = require('node-fetch');
 require('date-utils');
 
-function room_search(query, type, count, list) {
+function room_search_list(query, type, count, list) {
     return new Promise((resolve, reject) => {
         function callback(error, response, body) {
             if (error) {
@@ -47,7 +48,7 @@ function room_search(query, type, count, list) {
     });
 }
 
-function room_new(name){
+function room_search(name){
   return new Promise((rsv, rej) =>{
     var temp = "https://open.kakao.com/c/search/unified?q=" + name + "&resultType=m&s=l&c=30&exceptLock=N&p=1"
     var uri_s = encodeURI(temp);
@@ -83,5 +84,5 @@ function room_new(name){
     });
   });
 }
-module.exports.room_new = room_new;
+module.exports.room_search_list = room_search_list;
 module.exports.room_search = room_search;

@@ -1,3 +1,4 @@
+//© 2020 KeonWoo PARK <parkkw472@gmail.com>
 var mysql = require('mysql');
 require('date-utils');
 String.prototype.replaceAll = function(org, dest) {

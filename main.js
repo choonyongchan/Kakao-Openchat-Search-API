@@ -1,3 +1,4 @@
+//© 2020 KeonWoo PARK <parkkw472@gmail.com>
 var express = require('express');
 var app = express();
 var db = require("./mysql_db");
@@ -22,7 +23,7 @@ app.get('/search/room', async function (req, res) {
         db.logging(ips, req.headers['user-agent'], "None", " ", "false", "room param missing", ip.address());
         return;
     }
-    kakao.room_new(req.param("room")).then((result) => {
+    kakao.room_search(req.param("room")).then((result) => {
       if (result["success"] == 'false') {
         var ips = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
         res.json({ "success": "false", "reason": result['reason'], "Node": ip.address() });
@@ -61,7 +62,7 @@ app.get('/search/room/list', async function (req, res) {
         return;
     }
     else {
-        var result = await kakao.room_search(req.param("query"), req.param("type"), req.param("count") || 30, req.param("page") || 1);
+        var result = await kakao.room_search_list(req.param("query"), req.param("type"), req.param("count") || 30, req.param("page") || 1);
         res.json(result);
         db.logging_search([ips, req.headers['user-agent'], req.param("query"), req.param("type"), req.param("count") || 30, req.param("page") || 1, "true", "", ip.address()])
         return;

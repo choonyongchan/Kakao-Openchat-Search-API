@@ -12,35 +12,34 @@ var server = app.listen(1337, function () {
     console.log("API server has started on port 1337")
 })
 app.get('/', function (req, res) {
-    var ips = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    req.headers['x-forwarded-for'] != undefined ? ips = req.headers['x-forwarded-for'][0] : ips = req.connection.remoteAddress.replace("::ffff:","");
     ips = ips.replace(/^.*:/, '');
     res.json({ "success": true, "result": "Hello,There!", "User-Agent": req.headers['user-agent'], "Node": ip.address() });
 });
 app.get('/search/room', async function (req, res) {
     if (req.param("room") == undefined ||  req.param("room") == "") {
-        var ips = req.headers['x-forwarded-for'][0] || req.connection.remoteAddress;
+        req.headers['x-forwarded-for'] != undefined ? ips = req.headers['x-forwarded-for'][0] : ips = req.connection.remoteAddress.replace("::ffff:","");
         res.json({ "success": "false", "reason": "room param missing", "Node": ip.address() });
         db.logging(ips, req.headers['user-agent'], "None", " ", "false", "room param missing", ip.address());
         return;
     }
     kakao.room_search(req.param("room")).then((result) => {
-      if (result["success"] == 'false') {
-        var ips = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        res.json({ "success": "false", "reason": result['reason'], "Node": ip.address() });
-        db.logging(ips, req.headers['user-agent'], req.param("room"), " ", "false", result['reason'], ip.address());
-        return;
-      }
-      else if (result["success"] == 'true') {
-        var ips = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        res.json(result);
-        db.logging(ips, req.headers['user-agent'], req.param("room"),result["result"]["name"], "true", " ", ip.address());
-        return;
-      }
+        req.headers['x-forwarded-for'] != undefined ? ips = req.headers['x-forwarded-for'][0] : ips = req.connection.remoteAddress.replace("::ffff:","");
+        if (result["success"] == 'false') {
+            res.json({ "success": "false", "reason": result['reason'], "Node": ip.address() });
+            db.logging(ips, req.headers['user-agent'], req.param("room"), " ", "false", result['reason'], ip.address());
+            return;
+        }
+        else if (result["success"] == 'true') {
+            res.json(result);
+            db.logging(ips, req.headers['user-agent'], req.param("room"),result["result"]["name"], "true", " ", ip.address());
+            return;
+        }
     });
 });
 
 app.get('/search/room/list', async function (req, res) {
-    var ips = req.connection.remoteAddress;
+    req.headers['x-forwarded-for'] != undefined ? ips = req.headers['x-forwarded-for'][0] : ips = req.connection.remoteAddress.replace("::ffff:","");
     if (req.param("query") == undefined || req.param("type") == undefined) {
         res.json({ "success": false, "reason": "params missing", "Node": ip.address() });
         db.logging_search([ips, req.headers['user-agent'], "", "", req.param("count") || 30, req.param("page") || 1, "false", "params missing", ip.address()])

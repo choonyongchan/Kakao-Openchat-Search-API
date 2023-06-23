@@ -104,3 +104,6 @@ dist
 .tern-port
 
 venv/
+*.csv
+*.html
+kakao.log

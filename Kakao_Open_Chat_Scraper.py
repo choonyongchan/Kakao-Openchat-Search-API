@@ -1,75 +1,86 @@
 import aiohttp
+import argparse
 import asyncio
 from datetime import datetime
-import numpy as np
+import logging
+import math
 import os
 import pandas as pd
 from tqdm.asyncio import tqdm_asyncio
 import validators
 
 
+# Supress Aiohttp #4324
+logging.basicConfig(
+    filename='kakao.log',
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+
+
 class Kakao:
 
-    API: str = 'https://open.kakao.com/c/search/unified?q=kakao'
+    API: str = 'https://open.kakao.com/c/search/unified'
 
     def __init__(self, search_term: str):
         self.search_term: str = search_term
+        self.html_out: str = f"{search_term}.html"
+        self.csv_out: str = f"{search_term}.csv"
 
-    def check_resource_available(self, search_term: str) -> None:
+    def check_resource_available(self) -> bool:
 
         def get_path(filename: str) -> str:
             curr_dir = os.path.dirname(__name__)
-            abs_path = os.path.join(curr_dir, filename)
-            return abs_path
+            return os.path.join(curr_dir, filename)
 
         def check(filename: str) -> False:
-            # Check if file exists.
-            is_exist: bool = os.path.exists(get_path(filename))
-            if not is_exist:
-                return True
-            # If exists, check if file closed.
             try:
-                open(filename, 'r')
+                filepath = get_path(filename)
+                open(filepath, 'r')  # Try open file.
                 return True
+            except FileNotFoundError:
+                return True  # Confirm closed.
             except IOError:
-                return False
+                return False  # File is opened.
 
-        html_filename: str = search_term + '.html'
-        csv_filename: str = search_term + '.csv'
-        return check(html_filename) and check(csv_filename)
+        return check(self.html_out) and check(self.csv_out)
 
     async def get(self) -> pd.DataFrame:
 
-        async def get_per_page(page: int, session: aiohttp.ClientSession) -> dict:
-            params: dict = {
-                'q': self.search_term,
-                'p': page}
+        async def get_per_page(page: int) -> dict:
+            params['p'] = page
             async with session.get(self.API, params=params) as response:
                 return await response.json()
 
+        params: dict = {
+            'q': self.search_term,
+            'c': 100,
+            'p': 1}  # Default val
         async with aiohttp.ClientSession() as session:
             responses: list[dict] = await tqdm_asyncio.gather(
-                *(get_per_page(page, session) for page in range(1, 101)),
-                desc='Getting Open Chat Details',
+                *(get_per_page(page) for page in range(1, 101)),
+                desc='Finding Open Chats',
                 unit='page')
             return self.parse(responses)
 
     def parse(self, responses: list[dict]) -> pd.DataFrame:
 
         def drop_irr_cols(df: pd.DataFrame) -> pd.DataFrame:
-            irr_colnames: list[str] = ['lt', 'vrLiveon', 'jrds', 'profilePostCount', 'oc', 'op']
+            irr_colnames: list[str] = ['lt', 'vrLiveon', 'jrds',
+                                       'profilePostCount', 'oc', 'op']
             return df.drop(irr_colnames, axis=1)
 
         def parse_datetime(df: pd.DataFrame) -> pd.DataFrame:
             df['writtenAt'] = [
-                datetime.fromtimestamp(e) if not np.isnan(e) else e
-                for e in df['writtenAt']]
+                datetime.fromtimestamp(ep) if not math.isnan(ep) else ep
+                for ep in df['writtenAt']]
             return df
 
         def process_links(df: pd.DataFrame) -> pd.DataFrame:
             def get_per_link(url: str) -> str:
                 if not validators.url(url):
-                    return np.nan
+                    return math.nan
                 return '<a href="' + url + '" target="_blank">' + url + '</a>'
             df['lu'] = [get_per_link(url) for url in df['lu']]
             return df
@@ -77,13 +88,14 @@ class Kakao:
         def process_images(df: pd.DataFrame) -> pd.DataFrame:
             def get_per_image(url: str) -> bytes:
                 if not validators.url(url):
-                    return np.nan
+                    return math.nan
                 return '<img src="' + url + '" width="60" >'
             df['liu'] = [get_per_image(url) for url in df['liu']]
             df['pi'] = [get_per_image(url) for url in df['pi']]
             return df
 
-        dfs: list[pd.DataFrame] = (pd.DataFrame(resp['items']) for resp in responses)
+        dfs: list[pd.DataFrame] = (pd.DataFrame(r['items'])
+                                   for r in responses)
         df: pd.DataFrame = pd.concat(dfs, ignore_index=True)
 
         if df.empty:
@@ -95,29 +107,39 @@ class Kakao:
         df: pd.DataFrame = parse_datetime(df)
         df: pd.DataFrame = process_links(df)
         df: pd.DataFrame = process_images(df)
-
         return df
 
-    def save(self, df: pd.DataFrame, filename: str) -> None:
-        html_filename: str = filename + '.html'
-        csv_filename: str = filename + '.csv'
-
+    def save(self, df: pd.DataFrame) -> None:
         df.columns = ['Similarity Score', 'Open Chat Name', 'Open Chat Share Link', 'Password Locked?', 'Description', 'Open Chat Profile Picture', 'Member Count', 'Open Chat Admin', 'Admin Profile Picture', 'Search Hashtags', 'Last Message Sent At', 'Likes Count']
-        df.to_csv(csv_filename, index=False)
-        df.to_html(html_filename, index=False, escape=False)
+        df.to_csv(self.csv_out, index=False)
+        df.to_html(self.html_out, index=False, escape=False)
+        print(f"Results saved to {self.csv_out} and {self.html_out}")
+
+
+class ArgumentParser:
+
+    def __init__(self) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('search',
+                            metavar='SEARCH',
+                            type=str,
+                            help='Kakao Open Chat Search Term')
+        self.args = parser.parse_args()
+
+    def get_search(self):
+        return self.args.search
 
 
 async def main() -> None:
 
-    search_term: str = 'kakao'
-    kakao: Kakao = Kakao(search_term)
+    search: str = ArgumentParser().get_search()
+    kakao: Kakao = Kakao(search)
 
-    kakao.check_resource_available(search_term)
+    print("Kakao Open Chat Scraper by @choonyy")
+    kakao.check_resource_available()
     results: pd.DataFrame = await kakao.get()
-    kakao.save(results, search_term)
+    kakao.save(results)
 
 
 if __name__ == '__main__':
-    print("Kakao Open Chat Scraper by @choonyy")
     asyncio.run(main())
-    print("Completed")

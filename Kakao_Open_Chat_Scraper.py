@@ -10,16 +10,14 @@ from tqdm.asyncio import tqdm_asyncio
 import validators
 
 
-# Supress Aiohttp #4324
-logging.basicConfig(
-    filename='kakao.log',
-    format='%(asctime)s %(levelname)-8s %(message)s',
-    level=logging.INFO,
-    datefmt='%Y-%m-%d %H:%M:%S',
-)
-
-
 class Kakao:
+
+    logging.basicConfig(
+        filename='kakao.log',
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=logging.INFO,
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
 
     API: str = 'https://open.kakao.com/c/search/unified'
 
@@ -69,7 +67,7 @@ class Kakao:
         def drop_irr_cols(df: pd.DataFrame) -> pd.DataFrame:
             irr_colnames: list[str] = ['lt', 'vrLiveon', 'jrds',
                                        'profilePostCount', 'oc', 'op']
-            return df.drop(irr_colnames, axis=1)
+            return df.drop(df.columns.intersection(irr_colnames), axis=1)
 
         def parse_datetime(df: pd.DataFrame) -> pd.DataFrame:
             df['writtenAt'] = [
@@ -94,6 +92,9 @@ class Kakao:
             df['pi'] = [get_per_image(url) for url in df['pi']]
             return df
 
+        def remove_dups(df: pd.DataFrame) -> pd.DataFrame:
+            return df.drop_duplicates(subset=['lu'], keep='first')
+
         dfs: list[pd.DataFrame] = (pd.DataFrame(r['items'])
                                    for r in responses)
         df: pd.DataFrame = pd.concat(dfs, ignore_index=True)
@@ -107,10 +108,16 @@ class Kakao:
         df: pd.DataFrame = parse_datetime(df)
         df: pd.DataFrame = process_links(df)
         df: pd.DataFrame = process_images(df)
+        df: pd.DataFrame = remove_dups(df)
         return df
 
     def save(self, df: pd.DataFrame) -> None:
-        df.columns = ['Similarity Score', 'Open Chat Name', 'Open Chat Share Link', 'Password Locked?', 'Description', 'Open Chat Profile Picture', 'Member Count', 'Open Chat Admin', 'Admin Profile Picture', 'Search Hashtags', 'Last Message Sent At', 'Likes Count']
+        df.columns = ['Similarity Score', 'Open Chat Name',
+                      'Open Chat Share Link', 'Password Locked?',
+                      'Description', 'Open Chat Profile Picture',
+                      'Member Count', 'Open Chat Admin',
+                      'Admin Profile Picture', 'Search Hashtags',
+                      'Last Message Sent At', 'Likes Count']
         df.to_csv(self.csv_out, index=False)
         df.to_html(self.html_out, index=False, escape=False)
         print(f"Results saved to {self.csv_out} and {self.html_out}")
@@ -130,16 +137,17 @@ class ArgumentParser:
         return self.args.search
 
 
-async def main() -> None:
+def main() -> None:
 
     search: str = ArgumentParser().get_search()
     kakao: Kakao = Kakao(search)
 
     print("Kakao Open Chat Scraper by @choonyy")
     kakao.check_resource_available()
-    results: pd.DataFrame = await kakao.get()
+    results: pd.DataFrame = asyncio.run(kakao.get())
+    print(f"Number of Groups Found: {len(results)}")
     kakao.save(results)
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()

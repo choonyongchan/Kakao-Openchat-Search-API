@@ -13,7 +13,7 @@ import validators
 class Kakao:
 
     logging.basicConfig(
-        filename='kakao.log',
+        filename='logs/kakao.log',
         format='%(asctime)s %(levelname)-8s %(message)s',
         level=logging.INFO,
         datefmt='%Y-%m-%d %H:%M:%S'
@@ -23,8 +23,8 @@ class Kakao:
 
     def __init__(self, search_term: str):
         self.search_term: str = search_term
-        self.html_out: str = f"{search_term}.html"
-        self.csv_out: str = f"{search_term}.csv"
+        self.html_out: str = f"logs/{search_term}.html"
+        self.csv_out: str = f"logs/{search_term}.csv"
 
     def check_resource_available(self) -> bool:
 

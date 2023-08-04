@@ -65,8 +65,8 @@ class Kakao:
     def parse(self, responses: list[dict]) -> pd.DataFrame:
 
         def drop_irr_cols(df: pd.DataFrame) -> pd.DataFrame:
-            irr_colnames: list[str] = ['lt', 'vrLiveon', 'jrds',
-                                       'profilePostCount', 'oc', 'op']
+            irr_colnames: list[str] = ['channelLinkMeta', 'lt', 'vrLiveon',
+                                       'jrds', 'profilePostCount', 'oc', 'op']
             return df.drop(df.columns.intersection(irr_colnames), axis=1)
 
         def parse_datetime(df: pd.DataFrame) -> pd.DataFrame:
